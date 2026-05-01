@@ -1,36 +1,48 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
-import { Search, MapPin, ShieldCheck, Smartphone, Users } from 'lucide-react'
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+import { Search, MapPin, ShieldCheck, Smartphone, Users } from "lucide-react";
+import ListingCard from "@/components/ListingCard";
 
 type Listing = {
-  id: string
-  title: string
-  rent: number
-  beds_available: number
-  gender_preference: string
-  photos: string[]
-  description: string
-  areas: { name: string } | null
-  custom_area: string | null
-}
+  id: string;
+  title: string;
+  rent: number;
+  beds_available: number;
+  gender_preference: string;
+  photos: string[];
+  description: string;
+  areas: { name: string } | null;
+  custom_area: string | null;
+};
 
 export default function HomePage() {
-  const [featuredListings, setFeaturedListings] = useState<Listing[]>([])
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
 
   useEffect(() => {
     supabase
-      .from('listings')
-      .select('*, areas(name)')
-      .eq('status', 'live')
-      .order('created_at', { ascending: false })
+      .from("listings")
+      .select("*, areas(name)")
+      .eq("status", "live")
+      .order("created_at", { ascending: false })
       .limit(3)
       .then(({ data }) => {
-        if (data) setFeaturedListings(data as any)
-      })
-  }, [])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (data) setFeaturedListings(data as any);
+      });
+  }, []);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/listings?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-white">
@@ -47,12 +59,10 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Hero - using Tailwind v4 safe gradient */}
+      {/* Hero Section */}
       <section
         className="py-20 px-4"
-        style={{
-          background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
-        }}
+        style={{ background: "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)" }}
       >
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
@@ -62,16 +72,18 @@ export default function HomePage() {
             Search for rooms by university, area, or landmark
           </p>
 
-          <div className="flex items-center bg-white rounded-xl shadow-lg overflow-hidden max-w-xl mx-auto">
+          <form onSubmit={handleSearch} className="flex items-center bg-white rounded-xl shadow-lg overflow-hidden max-w-xl mx-auto">
             <input
               type="text"
               placeholder="Near IBA City Campus, Clifton..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 px-6 py-4 outline-none text-gray-700"
             />
-            <button className="bg-indigo-600 text-white px-8 py-4 font-bold hover:bg-indigo-700 transition flex items-center gap-2">
+            <button type="submit" className="bg-indigo-600 text-white px-8 py-4 font-bold hover:bg-indigo-700 transition flex items-center gap-2">
               <Search className="w-5 h-5" /> Find My Room
             </button>
-          </div>
+          </form>
 
           <p className="mt-4 text-sm text-gray-500">
             Trusted by 1,200+ students & professionals in Karachi
@@ -84,9 +96,9 @@ export default function HomePage() {
         <h3 className="text-2xl font-bold text-gray-900 mb-8 text-center">Popular Hubs</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {[
-            { name: 'DHA Phase 5', count: 120, color: 'bg-blue-50 text-blue-700' },
-            { name: 'Gulistan-e-Jauhar', count: 95, color: 'bg-emerald-50 text-emerald-700' },
-            { name: 'Clifton', count: 80, color: 'bg-amber-50 text-amber-700' },
+            { name: "DHA Phase 5", color: "bg-blue-50 text-blue-700" },
+            { name: "Gulistan-e-Jauhar", color: "bg-emerald-50 text-emerald-700" },
+            { name: "Clifton", color: "bg-amber-50 text-amber-700" },
           ].map((hub) => (
             <Link
               key={hub.name}
@@ -96,7 +108,7 @@ export default function HomePage() {
               <MapPin className="w-8 h-8 mx-auto mb-2 text-indigo-600" />
               <p className="font-bold text-lg">{hub.name}</p>
               <span className={`inline-block mt-2 px-4 py-1 rounded-full text-sm font-medium ${hub.color}`}>
-                {hub.count}+ rooms
+                Popular
               </span>
             </Link>
           ))}
@@ -117,41 +129,9 @@ export default function HomePage() {
             <p className="text-center text-gray-500">No listings yet. Be the first to post!</p>
           ) : (
             <div className="grid md:grid-cols-3 gap-8">
-              {featuredListings.map((listing) => {
-                const areaName = listing.areas?.name || listing.custom_area || 'Karachi'
-                return (
-                  <Link
-                    key={listing.id}
-                    href={`/listings/${listing.id}`}
-                    className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition border border-gray-100"
-                  >
-                    <div className="h-48 bg-gray-200 flex items-center justify-center">
-                      {listing.photos?.[0] ? (
-                        <img src={listing.photos[0]} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-4xl">🏠</span>
-                      )}
-                    </div>
-                    <div className="p-5">
-                      <div className="flex items-start justify-between">
-                        <h4 className="font-bold text-lg text-gray-900">{listing.title}</h4>
-                        <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full font-medium">
-                          Verified
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {areaName} &middot; {listing.beds_available} bed{listing.beds_available > 1 ? 's' : ''}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {listing.gender_preference === 'any' ? 'Any Gender' : listing.gender_preference === 'male' ? 'Male Only' : 'Female Only'}
-                      </p>
-                      <p className="mt-3 font-bold text-indigo-600 text-lg">
-                        PKR {listing.rent.toLocaleString()}/mo
-                      </p>
-                    </div>
-                  </Link>
-                )
-              })}
+              {featuredListings.map((listing) => (
+                <ListingCard key={listing.id} listing={listing} />
+              ))}
             </div>
           )}
         </div>
@@ -196,5 +176,5 @@ export default function HomePage() {
         © 2026 Gharzaroor.pk – Har zaroorat ka ek ghar. Built with 💜 for Karachi.
       </footer>
     </main>
-  )
+  );
 }

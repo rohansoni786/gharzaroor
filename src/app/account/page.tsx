@@ -4,17 +4,17 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Phone, Lock } from 'lucide-react'
+import type { User } from '@supabase/supabase-js'
 
 export default function AccountPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [phone, setPhone] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
-  // Check auth & load profile
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -24,7 +24,6 @@ export default function AccountPage() {
       }
       setUser(user)
 
-      // Load current profile
       const { data: profile } = await supabase
         .from('profiles')
         .select('phone_number, whatsapp_number')
@@ -44,6 +43,8 @@ export default function AccountPage() {
     e.preventDefault()
     setSaving(true)
     setMessage('')
+
+    if (!user) return
 
     const { error } = await supabase
       .from('profiles')

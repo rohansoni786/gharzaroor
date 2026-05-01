@@ -7,15 +7,19 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Upload, X, ImagePlus } from 'lucide-react'
+import { CONFIG } from '@/config'
 
-// Updated schema
 const listingSchema = z.object({
   title: z.string().min(5, 'Title too short').max(100),
   area_type: z.enum(['preset', 'other']),
   area_id: z.string().uuid('Select a landmark').optional(),
   custom_area: z.string().optional(),
-  rent: z.coerce.number().min(5000, 'Min PKR 5,000').max(50000, 'Max PKR 50,000'),
-  beds_available: z.coerce.number().min(1, 'At least 1 bed').max(4, 'Max 4 beds'),
+  rent: z.coerce.number()
+    .min(CONFIG.MIN_RENT, `Min PKR ${CONFIG.MIN_RENT.toLocaleString()}`)
+    .max(CONFIG.MAX_RENT, `Max PKR ${CONFIG.MAX_RENT.toLocaleString()}`),
+  beds_available: z.coerce.number()
+    .min(CONFIG.MIN_BEDS, `At least ${CONFIG.MIN_BEDS} bed`)
+    .max(CONFIG.MAX_BEDS, `Max ${CONFIG.MAX_BEDS} beds`),
   gender_preference: z.enum(['male', 'female', 'any']),
   description: z.string().optional(),
   amenities: z.array(z.string()).optional(),
@@ -29,28 +33,27 @@ const listingSchema = z.object({
 ).refine(
   (data) => {
     if (data.area_type === 'other' && data.custom_area) {
-      return data.custom_area.length >= 3 && data.custom_area.length <= 100
+      return data.custom_area.length >= CONFIG.LANDMARK_CHAR_MIN && data.custom_area.length <= CONFIG.LANDMARK_CHAR_MAX
     }
     return true
   },
-  { message: 'Custom landmark must be 3-100 characters', path: ['custom_area'] }
+  { message: `Custom landmark must be ${CONFIG.LANDMARK_CHAR_MIN}-${CONFIG.LANDMARK_CHAR_MAX} characters`, path: ['custom_area'] }
 )
 
 type FormData = z.infer<typeof listingSchema>
 
-// Resize logic (unchanged)
 const resizeImage = (file: File): Promise<File> => {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.src = URL.createObjectURL(file)
     img.onload = () => {
-      if (img.width <= 800) {
+      if (img.width <= CONFIG.PHOTO_MAX_WIDTH) {
         resolve(file)
         return
       }
       const canvas = document.createElement('canvas')
-      const ratio = 800 / img.width
-      canvas.width = 800
+      const ratio = CONFIG.PHOTO_MAX_WIDTH / img.width
+      canvas.width = CONFIG.PHOTO_MAX_WIDTH
       canvas.height = img.height * ratio
       const ctx = canvas.getContext('2d')
       ctx?.drawImage(img, 0, 0, canvas.width, canvas.height)
@@ -74,21 +77,31 @@ export default function PostListingPage() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, watch } = useForm<FormData>({
-  resolver: zodResolver(listingSchema) as any,
-  defaultValues: {
-    area_type: 'preset',
-    amenities: [],
-    rent: 0,
-    beds_available: 0,
-    title: '',
-    gender_preference: 'any',       // required field, must not be undefined
-    custom_area: '',
-    description: '',
-    area_id: undefined,
-  },
-})
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) {
+        router.replace('/auth')
+      }
+    })
+  }, [router])
 
+  const { register, handleSubmit, formState: { errors, isSubmitting }, watch, reset } = useForm<FormData>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(listingSchema) as any,
+    defaultValues: {
+      area_type: 'preset',
+      amenities: [],
+      rent: 0,
+      beds_available: 0,
+      title: '',
+      gender_preference: 'any',
+      custom_area: '',
+      description: '',
+      area_id: undefined,
+    },
+  })
+
+    // eslint-disable-next-line react-hooks/incompatible-library
   const areaType = watch('area_type')
 
   useEffect(() => {
@@ -101,7 +114,7 @@ export default function PostListingPage() {
     const files = e.target.files
     if (!files) return
     const newPhotos = Array.from(files)
-    const combined = [...photos, ...newPhotos].slice(0, 3)
+    const combined = [...photos, ...newPhotos].slice(0, CONFIG.MAX_PHOTOS)
     setPhotos(combined)
     e.target.value = ''
   }
@@ -121,7 +134,6 @@ export default function PostListingPage() {
 
     setUploading(true)
 
-    // Upload photos
     const photoUrls: string[] = []
     for (const file of photos) {
       try {
@@ -133,14 +145,14 @@ export default function PostListingPage() {
         if (uploadError) throw uploadError
         const { data: { publicUrl } } = supabase.storage.from('listings').getPublicUrl(fileName)
         photoUrls.push(publicUrl)
-      } catch (err: any) {
-        setError(`Photo upload failed: ${err.message}`)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Upload failed'
+        setError(`Photo upload failed: ${message}`)
         setUploading(false)
         return
       }
     }
 
-    // Prepare listing payload
     const payload = {
       owner_id: user.id,
       title: data.title,
@@ -167,6 +179,8 @@ export default function PostListingPage() {
       return
     }
 
+    reset()
+    setPhotos([])
     setUploading(false)
     router.push(`/listings/${listing.id}`)
   }
@@ -181,7 +195,6 @@ export default function PostListingPage() {
       {error && <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
-        {/* Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
           <input
@@ -192,7 +205,6 @@ export default function PostListingPage() {
           {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title.message}</p>}
         </div>
 
-        {/* Area Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">Nearest Landmark</label>
           <div className="flex items-center gap-4 mb-2">
@@ -219,6 +231,7 @@ export default function PostListingPage() {
           ) : (
             <input
               {...register('custom_area')}
+              maxLength={CONFIG.LANDMARK_CHAR_MAX}
               placeholder="Enter your landmark (e.g., 'Near ABC Hospital')"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
             />
@@ -229,7 +242,6 @@ export default function PostListingPage() {
           {errors.area_type && <p className="text-red-500 text-xs mt-1">Please select an option</p>}
         </div>
 
-        {/* Rent & Beds */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Rent (PKR/month)</label>
@@ -253,7 +265,6 @@ export default function PostListingPage() {
           </div>
         </div>
 
-        {/* Gender */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Gender Preference</label>
           <select
@@ -268,7 +279,6 @@ export default function PostListingPage() {
           {errors.gender_preference && <p className="text-red-500 text-xs mt-1">{errors.gender_preference.message}</p>}
         </div>
 
-        {/* Amenities */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">Amenities</label>
           <div className="flex flex-wrap gap-3">
@@ -286,7 +296,6 @@ export default function PostListingPage() {
           </div>
         </div>
 
-        {/* Description */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
           <textarea
@@ -297,13 +306,13 @@ export default function PostListingPage() {
           />
         </div>
 
-        {/* Photos */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">Photos (max 3)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Photos (max {CONFIG.MAX_PHOTOS})</label>
           <div className="flex gap-4 flex-wrap">
             {photos.map((file, idx) => (
               <div key={idx} className="relative w-24 h-24 bg-gray-100 rounded-lg overflow-hidden border">
-                <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={URL.createObjectURL(file)} alt="Preview" className="w-full h-full object-cover" />
                 <button
                   type="button"
                   onClick={() => removePhoto(idx)}
@@ -313,7 +322,7 @@ export default function PostListingPage() {
                 </button>
               </div>
             ))}
-            {photos.length < 3 && (
+            {photos.length < CONFIG.MAX_PHOTOS && (
               <label className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 transition text-gray-500">
                 <ImagePlus className="w-6 h-6 mb-1" />
                 <span className="text-xs">Add</span>
@@ -327,10 +336,9 @@ export default function PostListingPage() {
               </label>
             )}
           </div>
-          <p className="text-xs text-gray-400 mt-2">Each photo resized to max 800px. JPG only.</p>
+          <p className="text-xs text-gray-400 mt-2">Each photo resized to max {CONFIG.PHOTO_MAX_WIDTH}px. JPG only.</p>
         </div>
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={isSubmitting || uploading}

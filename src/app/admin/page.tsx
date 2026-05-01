@@ -1,40 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Eye, CheckCircle, XCircle, BarChart3 } from 'lucide-react'
+import { CheckCircle, XCircle } from 'lucide-react'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRow = Record<string, any>
 
 export default function AdminPage() {
   const router = useRouter()
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [flaggedListings, setFlaggedListings] = useState<any[]>([])
+  const [flaggedListings, setFlaggedListings] = useState<AnyRow[]>([])
   const [stats, setStats] = useState({ listings: 0, users: 0, inquiries: 0 })
   const [message, setMessage] = useState('')
 
-  // Admin check
-  useEffect(() => {
-    const check = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return router.push('/auth')
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('trust_score')
-        .eq('id', user.id)
-        .single()
-      if (!profile || profile.trust_score < 90) {
-        setMessage('Access denied.')
-        setLoading(false)
-        return
-      }
-      setIsAdmin(true)
-      fetchData()
-    }
-    check()
-  }, [])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     // Flagged listings
     const { data: flagged } = await supabase
       .from('listings')
@@ -61,7 +43,30 @@ export default function AdminPage() {
       inquiries: inquiriesCount || 0,
     })
     setLoading(false)
-  }
+  }, [])
+
+  useEffect(() => {
+    const check = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/auth')
+        return
+      }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('trust_score')
+        .eq('id', user.id)
+        .single()
+      if (!profile || profile.trust_score < 90) {
+        setMessage('Access denied.')
+        setLoading(false)
+        return
+      }
+      setIsAdmin(true)
+      fetchData()
+    }
+    check()
+  }, [router, fetchData])
 
   const handleAction = async (id: string, status: 'live' | 'rejected') => {
     const { error } = await supabase
@@ -69,7 +74,7 @@ export default function AdminPage() {
       .update({ status })
       .eq('id', id)
     if (error) setMessage(`Error: ${error.message}`)
-    else fetchData() // reload
+    else fetchData()
   }
 
   if (loading) return <div className="p-8 text-center">Loading...</div>
