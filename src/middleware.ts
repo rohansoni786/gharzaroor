@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { NextResponse, NextRequest } from "next/server";
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public routes – anyone can access (only the landing page and about)
-  const publicPaths = ["/", "/about"];
-
+  // Public routes – anyone can access
+  const publicPaths = ["/", "/about", "/auth"];
+  
   // Also allow static assets and Next.js internals
   const isStatic =
     pathname.startsWith("/_next") ||
@@ -18,7 +18,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // All other routes require authentication
+  // Create Supabase client for auth check
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -28,8 +28,9 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookies) {
-          cookies.forEach(({ name, value }) => {
+          cookies.forEach(({ name, value, options }) => {
             request.cookies.set(name, value);
+            NextResponse.next().cookies.set(name, value, options);
           });
         },
       },
@@ -38,22 +39,29 @@ export async function proxy(request: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession();
 
+  // Redirect to login if no session
   if (!session) {
-    // Redirect to homepage with modal trigger
     const signInUrl = new URL("/?auth=login", request.url);
     signInUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(signInUrl);
   }
 
-  // Admin routes – extra security
+  // Admin routes – extra security check
   if (pathname.startsWith("/admin")) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("trust_score")
-      .eq("id", session.user.id)
-      .single();
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("trust_score")
+        .eq("id", session.user.id)
+        .single();
 
-    if (!profile || profile.trust_score < 90) {
+      if (!profile || (profile as { trust_score: number }).trust_score < 90) {
+        const notAllowedUrl = new URL("/", request.url);
+        notAllowedUrl.searchParams.set("error", "admin_access_denied");
+        return NextResponse.redirect(notAllowedUrl);
+      }
+    } catch {
+      // If profile check fails, deny access
       const notAllowedUrl = new URL("/", request.url);
       notAllowedUrl.searchParams.set("error", "admin_access_denied");
       return NextResponse.redirect(notAllowedUrl);
@@ -64,7 +72,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // Match all paths except static files, images, and the home page
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

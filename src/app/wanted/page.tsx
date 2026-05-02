@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Search, MapPin, Bed, Banknote, Phone } from 'lucide-react'
 
@@ -63,19 +64,44 @@ function WantedContent() {
     fetchAds()
   }, [search, areaFilter])
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  }
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  }
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="max-w-6xl mx-auto px-4 py-8"
+    >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Wanted – Room Requests</h1>
         <Link
           href="/wanted/post"
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-indigo-700 transition"
+          className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-indigo-700 transition hover:scale-[1.02] active:scale-[0.98]"
         >
           + Post Your Request
         </Link>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="flex flex-col sm:flex-row gap-4 mb-8 bg-white/70 backdrop-blur-md p-4 rounded-xl border border-white/20"
+      >
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
           <input
@@ -83,20 +109,20 @@ function WantedContent() {
             placeholder="Search requests..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50"
           />
         </div>
         <select
           value={areaFilter}
           onChange={(e) => setAreaFilter(e.target.value)}
-          className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+          className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50"
         >
           <option value="">All Areas</option>
           {areas.map((a) => (
             <option key={a.name} value={a.name}>{a.name}</option>
           ))}
         </select>
-      </div>
+      </motion.div>
 
       {loading && <p className="text-center py-24 text-gray-500">Loading...</p>}
       {!loading && ads.length === 0 && (
@@ -107,9 +133,19 @@ function WantedContent() {
         </div>
       )}
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+      >
         {ads.map((ad) => (
-          <div key={ad.id} className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-lg transition border border-gray-100 p-5">
+          <motion.div 
+            variants={cardVariants}
+            whileHover={{ scale: 1.02 }}
+            key={ad.id} 
+            className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition border border-white/20 p-5"
+          >
             <div className="flex items-start justify-between mb-3">
               <h3 className="font-bold text-lg">
                 {ad.beds_needed} Bed{ad.beds_needed > 1 ? 's' : ''} needed
@@ -139,10 +175,10 @@ function WantedContent() {
             >
               <Phone className="w-4 h-4" /> Contact Seeker
             </Link>
-          </div>
+          </motion.div>
         ))}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
 

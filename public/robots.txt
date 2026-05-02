@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+# Disallow admin routes
+Disallow: /admin
+Disallow: /account
+Disallow: /post-listing
+Disallow: /wanted/post
+
+# Sitemap
+Sitemap: https://gharzaroor.pk/sitemap.xml

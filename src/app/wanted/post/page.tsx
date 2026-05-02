@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { motion } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -108,14 +109,23 @@ const areaType = watch('area_type')
     router.push('/wanted')
   }
 
-  return (
-    <div className="max-w-2xl mx-auto px-4 py-12">
+return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="max-w-2xl mx-auto px-4 py-12"
+    >
       <h1 className="text-3xl font-bold text-gray-900 mb-2">Post a Room Request</h1>
       <p className="text-gray-500 mb-8">Let owners know what you need.</p>
 
       {error && <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+      <motion.form 
+        onSubmit={handleSubmit(onSubmit)} 
+        whileHover={{ scale: 1.01 }}
+        className="space-y-8 bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-xl border border-white/20"
+      >
         {/* Area Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">Preferred Area</label>
@@ -131,7 +141,7 @@ const areaType = watch('area_type')
           </div>
 
           {areaType === 'preset' ? (
-            <select {...register('area_id')} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+            <select {...register('area_id')} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50">
               <option value="">Select a landmark...</option>
               {areas.map((area) => (
                 <option key={area.id} value={area.id}>{area.name}</option>
@@ -142,7 +152,7 @@ const areaType = watch('area_type')
               {...register('custom_area')}
               maxLength={CONFIG.LANDMARK_CHAR_MAX}
               placeholder="Enter your landmark"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50"
             />
           )}
           {errors.custom_area && <p className="text-red-500 text-xs mt-1">{errors.custom_area.message}</p>}
@@ -152,12 +162,12 @@ const areaType = watch('area_type')
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Min Rent (PKR)</label>
-            <input type="number" {...register('rent_min')} placeholder="8000" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+            <input type="number" {...register('rent_min')} placeholder="8000" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50" />
             {errors.rent_min && <p className="text-red-500 text-xs mt-1">{errors.rent_min.message}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Max Rent (PKR)</label>
-            <input type="number" {...register('rent_max')} placeholder="15000" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+            <input type="number" {...register('rent_max')} placeholder="15000" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50" />
             {errors.rent_max && <p className="text-red-500 text-xs mt-1">{errors.rent_max.message}</p>}
           </div>
         </div>
@@ -165,14 +175,14 @@ const areaType = watch('area_type')
         {/* Beds Needed */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Beds Needed</label>
-          <input type="number" {...register('beds_needed')} placeholder="1" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+          <input type="number" {...register('beds_needed')} placeholder="1" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50" />
           {errors.beds_needed && <p className="text-red-500 text-xs mt-1">{errors.beds_needed.message}</p>}
         </div>
 
         {/* Gender */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Gender Preference</label>
-          <select {...register('gender_preference')} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+          <select {...register('gender_preference')} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50">
             <option value="any">Any Gender</option>
             <option value="male">Male Only</option>
             <option value="female">Female Only</option>
@@ -187,18 +197,20 @@ const areaType = watch('area_type')
             {...register('description')}
             rows={3}
             placeholder="Any extra requirements..."
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50"
           />
         </div>
 
-        <button
+        <motion.button
           type="submit"
           disabled={submitting}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition disabled:opacity-70"
         >
           {submitting ? 'Posting...' : 'Post Request'}
-        </button>
-      </form>
-    </div>
+        </motion.button>
+      </motion.form>
+    </motion.div>
   )
 }

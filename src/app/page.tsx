@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { FREE_PERIOD_END } from '@/lib/constants'
 import Link from 'next/link'
 import { Search, MapPin, X, Eye, EyeOff } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import ListingCard from '@/components/ListingCard'
 
 type ModalView = 'login' | 'forgot' | 'forgot-otp' | 'forgot-reset' | 'register' | 'register-verify'
@@ -19,6 +21,7 @@ export default function HomePage() {
   const [featuredListings, setFeaturedListings] = useState<any[]>([])
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [modalView, setModalView] = useState<ModalView>('login')
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -28,8 +31,35 @@ export default function HomePage() {
   const [otp, setOtp] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [authError, setAuthError] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
+const [authLoading, setAuthLoading] = useState(false)
   const [authMessage, setAuthMessage] = useState('')
+
+  // Countdown timer state
+  const [freeDaysLeft, setFreeDaysLeft] = useState(0)
+
+  // Calculate days until FREE_PERIOD_END
+  useEffect(() => {
+    const endDate = new Date(FREE_PERIOD_END)
+    const today = new Date()
+    const diffTime = endDate.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    setFreeDaysLeft(Math.max(0, diffDays))
+  }, [])
+
+  // ── Check if user is logged in ──
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(!!session)
+    })
+  }, [])
+
+  // ── Listen for auth state changes ──
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session)
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
 
   // ── Effect: open modal if ?auth=login ──
   useEffect(() => {
@@ -94,7 +124,7 @@ export default function HomePage() {
     } else {
       closeAuthModal()
       if (redirectAfterLogin) router.push(redirectAfterLogin)
-      else router.refresh()
+      else router.push('/dashboard')
     }
     setAuthLoading(false)
   }
@@ -197,7 +227,7 @@ export default function HomePage() {
     else {
       closeAuthModal()
       if (redirectAfterLogin) router.push(redirectAfterLogin)
-      else router.refresh()
+      else router.push('/dashboard')
     }
     setAuthLoading(false)
   }
@@ -219,6 +249,24 @@ export default function HomePage() {
   // ─────────────────── RENDER ───────────────────
   return (
     <main className="min-h-screen bg-white">
+{/* COUNTDOWN BANNER */}
+      {freeDaysLeft > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-indigo-600 to-indigo-700 py-2 px-4 text-center"
+        >
+          <motion.span
+            initial={{ scale: 1 }}
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="text-white font-semibold text-sm md:text-base"
+          >
+            🔥 FREE for {freeDaysLeft} more day{freeDaysLeft === 1 ? '' : 's'}! Post your listing now at no cost.
+          </motion.span>
+        </motion.div>
+      )}
+
       {/* NAVBAR */}
       <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
@@ -230,12 +278,21 @@ export default function HomePage() {
             <Link href="/wanted" className="hover:text-indigo-600 transition">Wanted</Link>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => openAuthModal('login')}
-              className="hidden md:inline-flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold text-sm hover:bg-indigo-700 transition"
-            >
-              Sign In
-            </button>
+            {isLoggedIn ? (
+              <Link
+                href="/dashboard"
+                className="hidden md:inline-flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold text-sm hover:bg-indigo-700 transition"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <button
+                onClick={() => openAuthModal('login')}
+                className="hidden md:inline-flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold text-sm hover:bg-indigo-700 transition"
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </div>
       </nav>
@@ -426,7 +483,7 @@ export default function HomePage() {
                   </button>
 
                   <p className="text-center text-sm text-gray-500 mt-6">
-                    Don’t have an account?{' '}
+                    Don't have an account?{' '}
                     <button onClick={() => setModalView('register')} className="text-indigo-600 font-medium hover:underline">
                       Register Now
                     </button>

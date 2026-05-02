@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
@@ -20,6 +21,23 @@ type Listing = {
   photos: string[];
   areas: { name: string } | null;
   custom_area: string | null;
+  status?: string;
+};
+
+// Framer Motion variants for stagger animation
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 },
 };
 
 function ListingsContent() {
@@ -87,12 +105,17 @@ function ListingsContent() {
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="max-w-6xl mx-auto px-4 py-8"
+    >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Available Shared Flats</h1>
         <Link
           href="/post-listing"
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-indigo-700 transition"
+          className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-indigo-700 transition active:scale-95"
         >
           + Post Free Listing
         </Link>
@@ -109,7 +132,7 @@ function ListingsContent() {
               setSearch(e.target.value);
               setPage(0);
             }}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white/70 backdrop-blur-md focus:ring-2 focus:ring-indigo-500 outline-none"
           />
         </div>
         <select
@@ -118,7 +141,7 @@ function ListingsContent() {
             setAreaFilter(e.target.value);
             setPage(0);
           }}
-          className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+          className="px-4 py-3 border border-gray-300 rounded-lg bg-white/70 backdrop-blur-md focus:ring-2 focus:ring-indigo-500 outline-none"
         >
           <option value="">All Areas</option>
           {areas.map((a) => (
@@ -139,34 +162,45 @@ function ListingsContent() {
 
       {!loading && listings.length > 0 && (
         <>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          >
             {listings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
+              <motion.div key={listing.id} variants={itemVariants}>
+                <ListingCard listing={listing} />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-6 mt-10">
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className="flex items-center gap-1 px-4 py-2 bg-white border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+                className="flex items-center gap-1 px-4 py-2 bg-white/80 backdrop-blur-md border border-white/20 rounded-lg disabled:opacity-40 hover:bg-white"
               >
                 <ChevronLeft className="w-4 h-4" /> Previous
-              </button>
+              </motion.button>
               <span className="text-sm text-gray-600">Page {page + 1} of {totalPages}</span>
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                className="flex items-center gap-1 px-4 py-2 bg-white border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+                className="flex items-center gap-1 px-4 py-2 bg-white/80 backdrop-blur-md border border-white/20 rounded-lg disabled:opacity-40 hover:bg-white"
               >
                 Next <ChevronRight className="w-4 h-4" />
-              </button>
+              </motion.button>
             </div>
           )}
         </>
       )}
-    </div>
+    </motion.div>
   );
 }
 

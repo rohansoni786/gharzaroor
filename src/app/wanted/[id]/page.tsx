@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { MapPin, Bed, Banknote, Phone, X } from 'lucide-react'
 
@@ -72,11 +73,19 @@ export default function WantedDetailPage() {
 
   const areaName = ad.areas?.name || ad.custom_area || 'Not specified'
 
-  return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="max-w-3xl mx-auto px-4 py-8"
+    >
       <Link href="/wanted" className="text-indigo-600 text-sm mb-4 inline-block hover:underline">← Back to requests</Link>
 
-      <div className="bg-white p-8 rounded-2xl shadow-lg border">
+      <motion.div 
+        whileHover={{ scale: 1.01 }}
+        className="bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-xl border border-white/20"
+      >
         <div className="flex items-start justify-between mb-6">
           <h1 className="text-2xl font-bold">{ad.beds_needed} Bed{ad.beds_needed > 1 ? 's' : ''} needed</h1>
           <span className="text-xs px-3 py-1 bg-amber-100 text-amber-700 rounded-full font-medium">Active</span>
@@ -99,28 +108,42 @@ export default function WantedDetailPage() {
 
         <p className="text-gray-700 whitespace-pre-wrap mb-6">{ad.description || 'No extra description.'}</p>
 
-        <button
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={handleReveal}
           disabled={revealLoading}
           className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition"
         >
           {revealLoading ? 'Loading...' : (<><Phone className="inline w-5 h-5 mr-2" /> Contact Seeker</>)}
-        </button>
+        </motion.button>
 
         {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
-      </div>
+      </motion.div>
 
-      {showModal && contact && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 relative">
-            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400"><X /></button>
-            <h2 className="text-2xl font-bold mb-4">Seeker Contact</h2>
-            <p className="mb-2">📞 {contact.phone}</p>
-            <p>💬 {contact.whatsapp}</p>
-            <p className="text-xs text-gray-400 mt-4">Use responsibly.</p>
-          </div>
-        </div>
-      )}
-    </div>
+      <AnimatePresence>
+        {showModal && contact && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white/90 backdrop-blur-md rounded-2xl max-w-sm w-full p-6 relative border border-white/20"
+            >
+              <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X /></button>
+              <h2 className="text-2xl font-bold mb-4">Seeker Contact</h2>
+              <p className="mb-2">📞 {contact.phone}</p>
+              <p>💬 {contact.whatsapp}</p>
+              <p className="text-xs text-gray-400 mt-4">Use responsibly.</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   )
 }

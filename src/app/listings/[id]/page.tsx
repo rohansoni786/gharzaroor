@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase, trackEvent } from "@/lib/supabase";
 import Link from "next/link";
 import Image from "next/image";
@@ -113,38 +114,57 @@ export default function ListingDetailPage() {
   if (error && !listing) return <div className="p-8 text-center text-red-600">{error}</div>;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="max-w-4xl mx-auto px-4 py-8"
+    >
       <Link href="/listings" className="text-indigo-600 text-sm mb-4 inline-block hover:underline">
         ← Back to listings
       </Link>
 
-      {/* Photo gallery */}
+      {/* Photo gallery - glass wrapper */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        {listing?.photos?.length ? (
-          listing.photos.map((url, i) => (
-            <div
-              key={i}
-              className="relative h-64 rounded-xl overflow-hidden"
-              style={{ position: "relative" }}
-            >
-              <Image
-                src={url}
-                alt={listing?.title || "Listing photo"}
-                fill
-                sizes="(max-width: 768px) 100vw, 33vw"
-                className="object-cover"
-              />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white/80 backdrop-blur-md rounded-xl border border-white/20 shadow-lg overflow-hidden"
+        >
+          {listing?.photos?.length ? (
+            listing.photos.map((url, i) => (
+              <motion.div
+                key={i}
+                whileHover={{ scale: 1.02 }}
+                className="relative h-64"
+              >
+                <Image
+                  src={url}
+                  alt={listing?.title || "Listing photo"}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  className="object-cover"
+                  unoptimized
+                />
+              </motion.div>
+            ))
+          ) : (
+            <div className="col-span-3 h-48 bg-gray-200 rounded-xl flex items-center justify-center text-4xl">
+              🏠
             </div>
-          ))
-        ) : (
-          <div className="col-span-3 h-48 bg-gray-200 rounded-xl flex items-center justify-center text-4xl">
-            🏠
-          </div>
-        )}
+          )}
+        </motion.div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-8">
-        <div className="md:col-span-2 space-y-6">
+        {/* Main content - glass card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="md:col-span-2 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6 space-y-6"
+        >
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{listing?.title}</h1>
             <p className="text-xl text-indigo-600 font-semibold">
@@ -167,15 +187,23 @@ export default function ListingDetailPage() {
               {listing?.description || "No description."}
             </p>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-white p-6 rounded-xl shadow-lg border space-y-4">
+        {/* Contact sidebar - glass card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="bg-white/80 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20 space-y-4"
+        >
           <h2 className="font-bold text-lg">Contact Owner</h2>
           <p className="text-sm text-gray-500">
             Verified listing. Contact unlocks direct communication.
           </p>
 
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
             onClick={handleReveal}
             disabled={revealLoading}
             className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition"
@@ -188,36 +216,50 @@ export default function ListingDetailPage() {
                 Reveal Contact
               </>
             )}
-          </button>
+          </motion.button>
 
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
             onClick={handleReport}
             className="w-full bg-red-50 text-red-600 py-3 rounded-lg font-semibold hover:bg-red-100 transition text-sm"
           >
             🚩 Report Listing
-          </button>
+          </motion.button>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
           {message && <p className="text-green-600 text-sm">{message}</p>}
-        </div>
+        </motion.div>
       </div>
 
-      {showModal && contact && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 relative">
-            <button
-              onClick={() => setShowModal(false)}
-              className="absolute top-4 right-4 text-gray-400"
+      <AnimatePresence>
+        {showModal && contact && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl max-w-sm w-full p-6 relative"
             >
-              <X />
-            </button>
-            <h2 className="text-2xl font-bold mb-4">Owner Contact</h2>
-            <p className="mb-2">📞 {contact.phone}</p>
-            <p>💬 {contact.whatsapp}</p>
-            <p className="text-xs text-gray-400 mt-4">Available for 48 hours</p>
-          </div>
-        </div>
-      )}
-    </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="absolute top-4 right-4 text-gray-400"
+              >
+                <X />
+              </button>
+              <h2 className="text-2xl font-bold mb-4">Owner Contact</h2>
+              <p className="mb-2">📞 {contact.phone}</p>
+              <p>💬 {contact.whatsapp}</p>
+              <p className="text-xs text-gray-400 mt-4">Available for 48 hours</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
