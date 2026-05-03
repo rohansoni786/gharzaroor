@@ -13,6 +13,7 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [flaggedListings, setFlaggedListings] = useState<AnyRow[]>([])
+  const [pendingListings, setPendingListings] = useState<AnyRow[]>([])
   const [stats, setStats] = useState({ listings: 0, users: 0, inquiries: 0 })
   const [message, setMessage] = useState('')
 
@@ -24,6 +25,14 @@ export default function AdminPage() {
       .eq('status', 'flagged')
       .order('created_at', { ascending: false })
     setFlaggedListings(flagged || [])
+
+    // Pending listings
+    const { data: pending } = await supabase
+      .from('listings')
+      .select('*, areas(name)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+    setPendingListings(pending || [])
 
     // Stats
     const { count: listingsCount } = await supabase
@@ -68,11 +77,11 @@ export default function AdminPage() {
     check()
   }, [router, fetchData])
 
-  const handleAction = async (id: string, status: 'live' | 'rejected') => {
-    const { error } = await supabase
-      .from('listings')
-      .update({ status })
-      .eq('id', id)
+  const handleModerate = async (id: string, status: 'live' | 'rejected') => {
+    const { error } = await supabase.rpc('moderate_listing', {
+      p_listing_id: id,
+      p_new_status: status
+    })
     if (error) setMessage(`Error: ${error.message}`)
     else fetchData()
   }
@@ -107,7 +116,7 @@ export default function AdminPage() {
       {/* Flagged Listings */}
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Flagged Listings ({flaggedListings.length})</h2>
       {flaggedListings.length === 0 ? (
-        <p className="text-gray-500">No listings to review.</p>
+        <p className="text-gray-500">No flagged listings.</p>
       ) : (
         <div className="space-y-4">
           {flaggedListings.map((listing) => (
@@ -121,13 +130,47 @@ export default function AdminPage() {
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => handleAction(listing.id, 'live')}
+                  onClick={() => handleModerate(listing.id, 'live')}
                   className="flex items-center gap-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700"
                 >
                   <CheckCircle className="w-4 h-4" /> Approve
                 </button>
                 <button
-                  onClick={() => handleAction(listing.id, 'rejected')}
+                  onClick={() => handleModerate(listing.id, 'rejected')}
+                  className="flex items-center gap-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700"
+                >
+                  <XCircle className="w-4 h-4" /> Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pending Listings */}
+      <h2 className="text-2xl font-bold text-gray-800 mb-4 mt-12">Pending Listings ({pendingListings.length})</h2>
+      {pendingListings.length === 0 ? (
+        <p className="text-gray-500">No pending listings.</p>
+      ) : (
+        <div className="space-y-4">
+          {pendingListings.map((listing) => (
+            <div key={listing.id} className="bg-amber-50 border-2 border-amber-200 p-6 rounded-xl shadow flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-lg">{listing.title}</h3>
+                <p className="text-sm text-gray-500">
+                  {listing.areas?.name || listing.custom_area || 'Custom'} • PKR {listing.rent}
+                </p>
+                <p className="text-xs text-gray-400">{listing.created_at}</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleModerate(listing.id, 'live')}
+                  className="flex items-center gap-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700"
+                >
+                  <CheckCircle className="w-4 h-4" /> Approve
+                </button>
+                <button
+                  onClick={() => handleModerate(listing.id, 'rejected')}
                   className="flex items-center gap-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700"
                 >
                   <XCircle className="w-4 h-4" /> Reject

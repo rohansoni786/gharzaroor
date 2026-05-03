@@ -10,7 +10,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Upload, X, ImagePlus, MessageCircle, Zap } from 'lucide-react'
 import { CONFIG } from '@/lib/constants'
 import { motion } from 'framer-motion'
-import type { ParseVacancyResult } from '@/types'
 
 const listingSchema = z.object({
   title: z.string().min(5, 'Title too short').max(100),
@@ -24,10 +23,10 @@ const listingSchema = z.object({
     .min(CONFIG.MIN_BEDS, `At least ${CONFIG.MIN_BEDS} bed`)
     .max(CONFIG.MAX_BEDS, `Max ${CONFIG.MAX_BEDS} beds`),
   gender_preference: z.enum(['male', 'female', 'any']),
-  phone_number: z.string().regex(/^$|03[0-4][0-9]{9}$/, 'Phone must be 03XX-XXXXXXX format (optional)').optional().or(z.literal('')),
-  type: z.enum(['permanent', 'temporary']).optional(),
   description: z.string().optional(),
   amenities: z.array(z.string()).optional(),
+  phone: z.string().optional(),  // profile phone
+  contact_phone: z.string().optional(),  // listing-specific hidden contact
 }).refine(
   (data) => {
     if (data.area_type === 'preset') return !!data.area_id
@@ -107,8 +106,7 @@ export default function PostListingPage() {
       custom_area: '',
       description: '',
       area_id: undefined,
-      phone_number: '',
-      type: 'permanent',
+      phone: '',
     },
   })
 
@@ -144,6 +142,7 @@ export default function PostListingPage() {
 
     setUploading(true)
 
+    // Upload photos
     const photoUrls: string[] = []
     for (const file of photos) {
       try {
@@ -163,18 +162,26 @@ export default function PostListingPage() {
       }
     }
 
+    // Update user's profile phone if provided
+    if (data.phone && data.phone.trim()) {
+      await supabase
+        .from('profiles')
+        .update({ phone_number: data.phone.trim() })
+        .eq('id', user.id)
+    }
+
+    // Prepare listing payload
     const payload = {
       owner_id: user.id,
       title: data.title,
       rent: data.rent,
       beds_available: data.beds_available,
       gender_preference: data.gender_preference,
-      phone_number: data.phone_number || null,
-      type: data.type || 'permanent',
       photos: photoUrls,
       amenities: data.amenities || [],
       description: data.description || '',
-      status: 'live',
+      contact_phone: data.contact_phone?.trim() || null,
+      status: 'pending',
       area_id: data.area_type === 'preset' ? data.area_id : null,
       custom_area: data.area_type === 'other' ? data.custom_area : null,
     }
@@ -213,8 +220,7 @@ export default function PostListingPage() {
       setValue('rent', parsed.rent || 0)
       setValue('beds_available', parsed.beds)
       setValue('gender_preference', parsed.gender_preference)
-      setValue('phone_number', parsed.contact || '')
-      setValue('type', parsed.type || 'permanent')
+      setValue('phone', parsed.contact || '')
       setValue('description', parsed.description)
       setValue('area_id', parsed.area_id || '')
       setValue('custom_area', parsed.custom_area || '')
@@ -253,7 +259,7 @@ export default function PostListingPage() {
       <motion.div 
         initial={{ opacity: 0, height: 0 }}
         animate={{ opacity: 1, height: 'auto' }}
-className="bg-linear-to-r from-indigo-50 to-blue-50 rounded-2xl p-6 border-2 border-dashed border-indigo-200 mb-8"
+        className="bg-linear-to-r from-indigo-50 to-blue-50 rounded-2xl p-6 border-2 border-dashed border-indigo-200 mb-8"
       >
         <div className="flex items-center gap-3 mb-4">
           <MessageCircle className="w-6 h-6 text-indigo-600" />
@@ -262,7 +268,7 @@ className="bg-linear-to-r from-indigo-50 to-blue-50 rounded-2xl p-6 border-2 bor
         <textarea
           value={whatsappMessage}
           onChange={(e) => setWhatsappMessage(e.target.value)}
-          placeholder="Paste raw WhatsApp vacancy message here... e.g. '1 permanent vacancy near tipu burger DHA Phase 2...'"
+          placeholder="Paste raw WhatsApp vacancy message here..."
           rows={6}
           className="w-full p-4 border border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 resize-vertical bg-white/50 backdrop-blur-sm text-sm"
         />
@@ -398,27 +404,26 @@ className="bg-linear-to-r from-indigo-50 to-blue-50 rounded-2xl p-6 border-2 bor
             {errors.gender_preference && <p className="text-red-500 text-xs mt-1">{errors.gender_preference.message}</p>}
           </div>
 
-          {/* Phone Number */}
+          {/* Profile Phone Number (optional) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number (optional)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Profile Phone Number (optional)</label>
             <input
-              {...register('phone_number')}
+              {...register('phone')}
               placeholder="03XX-XXXXXXX"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/60 backdrop-blur-sm"
             />
-            {errors.phone_number && <p className="text-red-500 text-xs mt-1">{errors.phone_number.message}</p>}
+            <p className="text-xs text-gray-400 mt-1">Your main contact number (saved to profile).</p>
           </div>
 
-          {/* Listing Type */}
+          {/* Listing Contact Phone (optional - hidden from public) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-            <select
-              {...register('type')}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Alternate Contact Phone (optional)</label>
+            <input
+              {...register('contact_phone')}
+              placeholder="03XX-XXXXXXX or +92..."
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/60 backdrop-blur-sm"
-            >
-              <option value="permanent">Permanent</option>
-              <option value="temporary">Temporary</option>
-            </select>
+            />
+            <p className="text-xs text-gray-400 mt-1">Extra number for this listing (visible only to you & admin).</p>
           </div>
 
           {/* Amenities */}

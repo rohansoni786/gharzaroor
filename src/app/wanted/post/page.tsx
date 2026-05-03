@@ -7,7 +7,7 @@ import { motion } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CONFIG } from '@/config'
+import { CONFIG } from '@/lib/constants'
 
 const wantedSchema = z.object({
   area_type: z.enum(['preset', 'other']),
@@ -18,6 +18,7 @@ const wantedSchema = z.object({
   beds_needed: z.coerce.number().min(CONFIG.MIN_BEDS).max(CONFIG.MAX_BEDS),
   gender_preference: z.enum(['male', 'female', 'any']),
   description: z.string().optional(),
+  contact_phone: z.string().optional(),
 }).refine(data => data.rent_max >= data.rent_min, {
   message: 'Max rent must be >= min rent',
   path: ['rent_max'],
@@ -85,6 +86,7 @@ const areaType = watch('area_type')
 
     const payload = {
       seeker_id: user.id,
+      contact_phone: data.contact_phone?.trim() || null,
       area_id: data.area_type === 'preset' ? data.area_id : null,
       custom_area: data.area_type === 'other' ? data.custom_area : null,
       rent_min: data.rent_min,
@@ -199,6 +201,17 @@ return (
             placeholder="Any extra requirements..."
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50"
           />
+        </div>
+
+        {/* Contact Phone (optional - hidden) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone (optional)</label>
+          <input
+            {...register('contact_phone')}
+            placeholder="03XX-XXXXXXX"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50"
+          />
+          <p className="text-xs text-gray-400 mt-1">Extra number for this request (admin only).</p>
         </div>
 
         <motion.button

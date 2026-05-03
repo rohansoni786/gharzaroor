@@ -31,6 +31,27 @@ export default function DashboardPage() {
   const [myWantedAds, setMyWantedAds] = useState<any[]>([])
   const [contactReveals, setContactReveals] = useState<any[]>([])
 
+  const handleOwnerStatusChange = async (newStatus: string, listingId: string) => {
+    const { error } = await supabase.rpc('moderate_listing', {
+      p_listing_id: listingId,
+      p_new_status: newStatus
+    })
+    if (error) {
+      alert(`Error: ${error.message}`)
+    } else {
+      // Refresh listings
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: listings } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('owner_id', user.id)
+          .order('created_at', { ascending: false })
+        setMyListings(listings || [])
+      }
+    }
+  }
+
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -129,13 +150,26 @@ export default function DashboardPage() {
               <div key={listing.id} className="bg-white p-4 rounded-xl shadow border">
                 <div className="flex items-start justify-between">
                   <h3 className="font-semibold text-gray-900 truncate">{listing.title}</h3>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    listing.status === 'live' ? 'bg-emerald-100 text-emerald-700' :
-                    listing.status === 'flagged' ? 'bg-red-100 text-red-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {listing.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      listing.status === 'live' ? 'bg-emerald-100 text-emerald-700' :
+                      listing.status === 'filled' ? 'bg-blue-100 text-blue-700' :
+                      listing.status === 'deleted' ? 'bg-gray-100 text-gray-700' :
+                      listing.status === 'flagged' ? 'bg-red-100 text-red-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {listing.status}
+                    </span>
+                    <select 
+                      value={listing.status} 
+                      onChange={(e) => handleOwnerStatusChange(e.target.value, listing.id)}
+                      className="text-xs px-2 py-1 rounded bg-white border border-gray-300 focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="live">Live</option>
+                      <option value="filled">Filled</option>
+                      <option value="deleted">Delete</option>
+                    </select>
+                  </div>
                 </div>
                 <p className="text-sm text-gray-500 mt-1">PKR {listing.rent?.toLocaleString()}/mo • {listing.beds_available} bed{listing.beds_available>1?'s':''}</p>
                 <Link href={`/listings/${listing.id}`} className="text-indigo-600 text-sm font-medium mt-3 inline-block hover:underline">

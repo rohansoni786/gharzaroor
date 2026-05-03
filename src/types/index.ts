@@ -11,11 +11,12 @@ export interface Listing {
   beds_available: number;
   gender_preference: 'male' | 'female' | 'any';
   phone_number: string | null;
+  contact_phone: string | null;
   type: 'permanent' | 'temporary' | null;
-  photos: string[];
-  description: string;
+  photos: string[] | null;
+  description: string | null;
   amenities: string[];
-  status: 'live' | 'pending' | 'flagged' | 'rejected';
+  status: 'live' | 'pending' | 'flagged' | 'rejected' | 'filled' | 'deleted';
   area_id: string | null;
   custom_area: string | null;
   owner_id: string;
@@ -27,6 +28,7 @@ export interface Listing {
 export interface WantedAd {
   id: string;
   seeker_id: string;
+  contact_phone: string | null;
   area_id: string | null;
   custom_area: string | null;
   rent_min: number;
@@ -50,8 +52,13 @@ export interface Area {
 export interface Profile {
   id: string;
   full_name: string | null;
+  email?: string | null;
   phone_number: string | null;
   whatsapp_number: string | null;
+  age?: number | null;
+  emergency_contact?: string | null;
+  occupation?: 'student' | 'professional' | 'both' | null;
+  avatar_url?: string | null;
   trust_score: number;
   created_at: string;
 }

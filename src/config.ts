@@ -1,9 +1,0 @@
-export const CONFIG = {
-  MIN_RENT: 5000,
-  MAX_RENT: 100000,
-  MIN_BEDS: 1,
-  MAX_BEDS: 10,
-  LANDMARK_CHAR_MIN: 3,
-  LANDMARK_CHAR_MAX: 100,
-} as const;
-

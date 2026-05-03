@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Search, MapPin, RotateCcw } from 'lucide-react'
@@ -17,16 +16,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 })
-
-type ListingWithArea = {
-  id: string
-  title: string
-  rent: number
-  beds_available: number
-  areas: { name: string; coordinates: [number, number] | null } | null
-  custom_area: string | null
-  status: string
-}
 
 type MapListing = {
   id: string
@@ -43,60 +32,65 @@ export default function MapPage() {
   const [filteredListings, setFilteredListings] = useState<MapListing[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
-  const [showRecenter, setShowRecenter] = useState(false)
 
   const KARACHI_CENTER: [number, number] = [24.8607, 67.0011]
 
   // Fetch live listings with area coordinates
   useEffect(() => {
-    supabase
-      .from('listings')
-      .select(`
-        id,
-        title,
-        rent,
-        beds_available,
-        custom_area,
-        areas:name (
-          name,
-          coordinates
-        )
-      `)
-      .eq('status', 'live')
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('Error fetching listings:', error)
-          setLoading(false)
-          return
+    const fetchListings = async () => {
+      const { data, error } = await supabase
+        .from('listings')
+        .select(`
+          id,
+          title,
+          rent,
+          beds_available,
+          custom_area,
+          areas!inner (
+            name,
+            coordinates
+          )
+        `)
+        .eq('status', 'live')
+
+      if (error) {
+        console.error('Error fetching listings:', error)
+        setLoading(false)
+        return
+      }
+
+      const mapListings: MapListing[] = (data || []).map((item: any) => {
+        let lat = KARACHI_CENTER[0]
+        let lng = KARACHI_CENTER[1]
+        let areaName = item.custom_area || 'Karachi'
+
+        if (item.areas && item.areas.coordinates) {
+          // coordinates is a PostGIS GEOGRAPHY type; Supabase returns it as an object with type and coordinates
+          const coords = item.areas.coordinates
+          if (coords.type === 'Point' && Array.isArray(coords.coordinates)) {
+            lng = coords.coordinates[0]
+            lat = coords.coordinates[1]
+          }
+          areaName = item.areas.name || areaName
         }
 
-        const mapListings: MapListing[] = (data as unknown as ListingWithArea[]).map((l) => {
-          let lat = KARACHI_CENTER[0]
-          let lng = KARACHI_CENTER[1]
-          let areaName = l.custom_area || 'Karachi'
-
-          if (l.areas?.coordinates) {
-            // GeoJSON Point: coordinates = [lng, lat]
-            lng = l.areas.coordinates[0]
-            lat = l.areas.coordinates[1]
-            areaName = l.areas.name || areaName
-          }
-
-          return {
-            id: l.id,
-            title: l.title,
-            rent: l.rent,
-            beds_available: l.beds_available,
-            areaName,
-            lat,
-            lng
-          }
-        })
-
-        setListings(mapListings)
-        setFilteredListings(mapListings)
-        setLoading(false)
+        return {
+          id: item.id,
+          title: item.title,
+          rent: item.rent,
+          beds_available: item.beds_available,
+          areaName,
+          lat,
+          lng,
+        }
       })
+
+      setListings(mapListings)
+      setFilteredListings(mapListings)
+      setLoading(false)
+    }
+
+    fetchListings()
   }, [])
 
   // Filter listings on search
@@ -106,14 +100,6 @@ export default function MapPage() {
     )
     setFilteredListings(filtered)
   }, [searchTerm, listings])
-
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value)
-  }
-
-  const clearSearch = () => {
-    setSearchTerm('')
-  }
 
   if (loading) {
     return (
@@ -137,12 +123,12 @@ export default function MapPage() {
             type="text"
             placeholder="Search landmarks (e.g. KU, DHA, Clifton)..."
             value={searchTerm}
-            onChange={handleSearch}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 bg-transparent outline-none py-4 px-2 text-gray-800 placeholder-gray-500"
           />
           {searchTerm && (
             <button
-              onClick={clearSearch}
+              onClick={() => setSearchTerm('')}
               className="p-3 hover:bg-gray-100 rounded-2xl transition-colors"
             >
               <RotateCcw className="w-5 h-5 text-gray-500" />
@@ -190,15 +176,6 @@ export default function MapPage() {
             </Popup>
           </Marker>
         ))}
-
-        {/* Recenter button */}
-        {showRecenter && (
-          <div className="leaflet-bottom leaflet-right !m-0 !p-0">
-            <button className="bg-white/90 backdrop-blur-md border border-white/50 shadow-lg rounded-full p-3 ml-4 mb-4 hover:shadow-xl transition-all">
-              <MapPin className="w-5 h-5 text-indigo-600" />
-            </button>
-          </div>
-        )}
       </MapContainer>
 
       {/* Empty state overlay */}
@@ -215,7 +192,7 @@ export default function MapPage() {
               Try searching for a different landmark or area. Popular options: KU, DHA, Clifton, Gulistan-e-Jauhar.
             </p>
             <button
-              onClick={clearSearch}
+              onClick={() => setSearchTerm('')}
               className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-indigo-700 transition"
             >
               Clear Search

@@ -33,6 +33,8 @@ export default function ListingDetailPage() {
   const [revealLoading, setRevealLoading] = useState(false);
   const [contact, setContact] = useState<{ phone: string; whatsapp: string } | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     supabase
@@ -40,13 +42,18 @@ export default function ListingDetailPage() {
       .select("*, areas(name)")
       .eq("id", listingId)
       .single()
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error || !data) {
           setError("Listing not found");
         } else {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           setListing(data as any);
-          trackEvent("listing_view", listingId);
+          trackEvent("listing_view", { id: listingId });
+          // Check if owner
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user && data.owner_id === user.id) {
+            setIsOwner(true);
+          }
         }
         setLoading(false);
       });
@@ -58,6 +65,12 @@ export default function ListingDetailPage() {
     setRevealLoading(true);
     setError("");
     setMessage("");
+
+    if (listing?.status !== 'live') {
+      setError("Contact reveal not available for this listing.");
+      setRevealLoading(false);
+      return;
+    }
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -81,11 +94,26 @@ export default function ListingDetailPage() {
     } else if (data && data.length > 0) {
       setContact(data[0]);
       setShowModal(true);
-      trackEvent("whatsapp_click", listingId);
+      trackEvent("whatsapp_click", { id: listingId });
     } else {
       setError("No contact available.");
     }
     setRevealLoading(false);
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this listing? It cannot be recovered.')) return;
+    setDeleteLoading(true);
+    const { error } = await supabase.rpc('moderate_listing', {
+      p_listing_id: listingId,
+      p_new_status: 'deleted'
+    });
+    if (error) {
+      setError(error.message);
+    } else {
+      setMessage('Listing deleted.');
+    }
+    setDeleteLoading(false);
   };
 
   const handleReport = async () => {
@@ -112,6 +140,7 @@ export default function ListingDetailPage() {
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
   if (error && !listing) return <div className="p-8 text-center text-red-600">{error}</div>;
+  if (!listing) return null; // Safety guard for TypeScript
 
   return (
     <motion.div
@@ -126,35 +155,28 @@ export default function ListingDetailPage() {
 
       {/* Photo gallery - glass wrapper */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-          className="bg-white/80 backdrop-blur-md rounded-xl border border-white/20 shadow-lg overflow-hidden"
-        >
-          {listing?.photos?.length ? (
-            listing.photos.map((url, i) => (
-              <motion.div
-                key={i}
-                whileHover={{ scale: 1.02 }}
-                className="relative h-64"
-              >
-                <Image
-                  src={url}
-                  alt={listing?.title || "Listing photo"}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 33vw"
-                  className="object-cover"
-                  unoptimized
-                />
-              </motion.div>
-            ))
-          ) : (
-            <div className="col-span-3 h-48 bg-gray-200 rounded-xl flex items-center justify-center text-4xl">
-              🏠
-            </div>
-          )}
-        </motion.div>
+        {listing.photos?.length > 0 ? (
+          listing.photos.map((url, i) => (
+            <motion.div
+              key={i}
+              whileHover={{ scale: 1.02 }}
+              className="relative h-64 rounded-xl overflow-hidden bg-white/80 backdrop-blur-md border border-white/20 shadow-lg"
+            >
+              <Image
+                src={url}
+                alt={listing.title || "Listing photo"}
+                fill
+                sizes="(max-width: 768px) 100vw, 33vw"
+                className="object-cover"
+                unoptimized
+              />
+            </motion.div>
+          ))
+        ) : (
+          <div className="col-span-3 h-48 bg-gray-200 rounded-xl flex items-center justify-center text-4xl">
+            🏠
+          </div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-8">
@@ -166,9 +188,9 @@ export default function ListingDetailPage() {
           className="md:col-span-2 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6 space-y-6"
         >
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{listing?.title}</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{listing.title}</h1>
             <p className="text-xl text-indigo-600 font-semibold">
-              PKR {listing?.rent?.toLocaleString()}/mo
+              PKR {listing.rent?.toLocaleString()}/mo
             </p>
           </div>
 
@@ -177,14 +199,14 @@ export default function ListingDetailPage() {
               <MapPin className="w-5 h-5" /> {areaName}
             </div>
             <div className="flex items-center gap-2">
-              <Bed className="w-5 h-5" /> {listing?.beds_available} Beds
+              <Bed className="w-5 h-5" /> {listing.beds_available} Beds
             </div>
           </div>
 
           <div>
             <h3 className="font-semibold mb-2">Description</h3>
             <p className="text-gray-700 whitespace-pre-wrap">
-              {listing?.description || "No description."}
+              {listing.description || "No description."}
             </p>
           </div>
         </motion.div>
@@ -201,12 +223,23 @@ export default function ListingDetailPage() {
             Verified listing. Contact unlocks direct communication.
           </p>
 
+          {listing.status !== 'live' && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+              <p className="text-yellow-800 text-sm font-medium">
+                {listing.status === 'pending' ? '⏳ This listing is pending admin approval' : 
+                 listing.status === 'filled' ? '✅ This listing is filled' :
+                 listing.status === 'deleted' ? '🗑️ This listing has been deleted' :
+                 '❌ This listing is not live'}
+              </p>
+            </div>
+          )}
+
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
             onClick={handleReveal}
-            disabled={revealLoading}
-            className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition"
+            disabled={revealLoading || listing.status !== 'live'}
+            className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition disabled:opacity-50"
           >
             {revealLoading ? (
               "Loading..."
@@ -218,11 +251,23 @@ export default function ListingDetailPage() {
             )}
           </motion.button>
 
+          {isOwner && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={handleDelete}
+              disabled={deleteLoading}
+              className="w-full bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition mt-2 disabled:opacity-50"
+            >
+              {deleteLoading ? "Deleting..." : "🗑️ Delete Listing"}
+            </motion.button>
+          )}
+
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
             onClick={handleReport}
-            className="w-full bg-red-50 text-red-600 py-3 rounded-lg font-semibold hover:bg-red-100 transition text-sm"
+            className="w-full bg-red-50 text-red-600 py-3 rounded-lg font-semibold hover:bg-red-100 transition text-sm mt-2"
           >
             🚩 Report Listing
           </motion.button>

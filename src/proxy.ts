@@ -1,13 +1,10 @@
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { NextResponse, NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public routes – anyone can access
   const publicPaths = ["/", "/about", "/auth"];
-  
-  // Also allow static assets and Next.js internals
   const isStatic =
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
@@ -15,71 +12,58 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api");
 
   if (publicPaths.includes(pathname) || isStatic) {
-  const response = NextResponse.next();
-  return response;
-}
+    return NextResponse.next();
+  }
 
-  // Create Supabase client for auth check
+  const response = NextResponse.next();
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
-            } catch {
-              // Ignore if called outside of request
-            }
-          },
+      cookies: {
+        getAll() {
+          const cookies = request.cookies.getAll();
+          console.log("🍪 Cookies received:", cookies.map(c => c.name));
+          return cookies;
         },
+        setAll(cookiesToSet) {
+          console.log("🍪 Setting cookies:", cookiesToSet.map(c => c.name));
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
+  console.log("👤 User:", user?.email || "not authenticated");
 
-  // Redirect to login if no session
-  if (!session) {
+  if (!user) {
     const signInUrl = new URL("/?auth=login", request.url);
     signInUrl.searchParams.set("redirect", pathname);
-    const response = NextResponse.redirect(signInUrl);
-    await supabase.auth.getSession();
-    return response;
+    return NextResponse.redirect(signInUrl);
   }
 
-  // Admin routes – extra security check
   if (pathname.startsWith("/admin")) {
-    try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("trust_score")
-        .eq("id", session.user.id)
-        .single();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("trust_score")
+      .eq("id", user.id)
+      .single();
 
-      if (!profile || (profile as { trust_score: number }).trust_score < 90) {
-        const notAllowedUrl = new URL("/", request.url);
-        notAllowedUrl.searchParams.set("error", "admin_access_denied");
-        return NextResponse.redirect(notAllowedUrl);
-      }
-    } catch {
-      // If profile check fails, deny access
+    if (!profile || profile.trust_score < 90) {
       const notAllowedUrl = new URL("/", request.url);
       notAllowedUrl.searchParams.set("error", "admin_access_denied");
-      const response = NextResponse.redirect(notAllowedUrl);
-      await supabase.auth.getSession();
-      return response;
+      return NextResponse.redirect(notAllowedUrl);
     }
   }
 
-  const response = NextResponse.next();
   return response;
 }
 
 export const config = {
-  // Match all paths except static files, images, and the home page
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
