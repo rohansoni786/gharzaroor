@@ -1,15 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
+import { AuthTrigger } from './AuthTrigger'
 import { FREE_PERIOD_END } from '@/lib/constants'
 import Link from 'next/link'
 import { Search, MapPin, X, Eye, EyeOff } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import ListingCard from '@/components/ListingCard'
+import type { Listing } from '@/types';
 
-type ModalView = 'login' | 'forgot' | 'forgot-otp' | 'forgot-reset' | 'register' | 'register-verify'
+type ListingWithArea = Listing & { areas: { name: string } | null };
+
+type ModalView = 'login' | 'forgot' | 'forgot-otp' | 'forgot-reset' | 'register' | 'register-verify';
 
 export default function HomePage() {
   const router = useRouter()
@@ -17,8 +22,7 @@ export default function HomePage() {
   // ── State (all hooks first) ──
   const [redirectAfterLogin, setRedirectAfterLogin] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [featuredListings, setFeaturedListings] = useState<any[]>([])
+  const [featuredListings, setFeaturedListings] = useState<ListingWithArea[]>([])
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [modalView, setModalView] = useState<ModalView>('login')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -31,7 +35,7 @@ export default function HomePage() {
   const [otp, setOtp] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [authError, setAuthError] = useState('')
-const [authLoading, setAuthLoading] = useState(false)
+  const [authLoading, setAuthLoading] = useState(false)
   const [authMessage, setAuthMessage] = useState('')
 
   // Countdown timer state
@@ -61,19 +65,17 @@ const [authLoading, setAuthLoading] = useState(false)
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  // ── Effect: open modal if ?auth=login ──
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('auth') === 'login') {
-      const redirect = params.get('redirect')
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (redirect) setRedirectAfterLogin(redirect)
-      setShowAuthModal(true)
-      setModalView('login')
-      // Clean URL so modal doesn't reopen on refresh
-      router.replace('/', { scroll: false })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Auth trigger callbacks
+  const handleRedirectSet = useCallback((redirect: string | null) => {
+    setRedirectAfterLogin(redirect)
+  }, [])
+
+  const handleModalOpen = useCallback(() => {
+    setShowAuthModal(true)
+  }, [])
+
+  const handleModalViewSet = useCallback((view: string) => {
+    setModalView(view as any)
   }, [])
 
   // ── Fetch featured listings ──
@@ -85,8 +87,7 @@ const [authLoading, setAuthLoading] = useState(false)
       .order('created_at', { ascending: false })
       .limit(3)
       .then(({ data }) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (data) setFeaturedListings(data as any)
+        if (data) setFeaturedListings(data as ListingWithArea[])
       })
   }, [])
 
@@ -248,13 +249,23 @@ const [authLoading, setAuthLoading] = useState(false)
 
   // ─────────────────── RENDER ───────────────────
   return (
-    <main className="min-h-screen bg-white">
+    <>
+      <Suspense fallback={null}>
+        <AuthTrigger 
+          onRedirectSet={handleRedirectSet}
+          onModalOpen={handleModalOpen}
+          onModalViewSet={handleModalViewSet}
+        />
+      </Suspense>
+      <main className="min-h-screen bg-white">
+
+
 {/* COUNTDOWN BANNER */}
       {freeDaysLeft > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-indigo-600 to-indigo-700 py-2 px-4 text-center"
+          className="bg-linear-to-r from-indigo-600 to-indigo-700 py-2 px-4 text-center"
         >
           <motion.span
             initial={{ scale: 1 }}
@@ -274,6 +285,7 @@ const [authLoading, setAuthLoading] = useState(false)
           <div className="hidden md:flex gap-8 text-sm font-medium text-gray-700">
             <Link href="/" className="text-indigo-600">Home</Link>
             <Link href="/listings" className="hover:text-indigo-600 transition">Browse Flats</Link>
+            <Link href="/map" className="hover:text-indigo-600 transition">Map View</Link>
             <Link href="/post-listing" className="hover:text-indigo-600 transition">Post Room</Link>
             <Link href="/wanted" className="hover:text-indigo-600 transition">Wanted</Link>
           </div>
@@ -582,6 +594,8 @@ const [authLoading, setAuthLoading] = useState(false)
           </div>
         </div>
       )}
-    </main>
+      </main>
+    </>
   )
 }
+

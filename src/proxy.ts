@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes – anyone can access
@@ -15,25 +15,27 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api");
 
   if (publicPaths.includes(pathname) || isStatic) {
-    return NextResponse.next();
-  }
+  const response = NextResponse.next();
+  return response;
+}
 
   // Create Supabase client for auth check
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+            } catch {
+              // Ignore if called outside of request
+            }
+          },
         },
-        setAll(cookies) {
-          cookies.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value);
-            NextResponse.next().cookies.set(name, value, options);
-          });
-        },
-      },
     }
   );
 
@@ -43,7 +45,9 @@ export async function middleware(request: NextRequest) {
   if (!session) {
     const signInUrl = new URL("/?auth=login", request.url);
     signInUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(signInUrl);
+    const response = NextResponse.redirect(signInUrl);
+    await supabase.auth.getSession();
+    return response;
   }
 
   // Admin routes – extra security check
@@ -64,11 +68,14 @@ export async function middleware(request: NextRequest) {
       // If profile check fails, deny access
       const notAllowedUrl = new URL("/", request.url);
       notAllowedUrl.searchParams.set("error", "admin_access_denied");
-      return NextResponse.redirect(notAllowedUrl);
+      const response = NextResponse.redirect(notAllowedUrl);
+      await supabase.auth.getSession();
+      return response;
     }
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  return response;
 }
 
 export const config = {

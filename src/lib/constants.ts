@@ -46,3 +46,20 @@ export const FEATURES = {
 
 // Free period for countdown banner
 export const FREE_PERIOD_END = '2026-08-01';
+
+export const LANDMARK_CHAR_MIN = 3;
+export const LANDMARK_CHAR_MAX = 100;
+export const COOLDOWN_SECONDS = 30;
+
+export const CONFIG = {
+  MAX_RENT,
+  MIN_RENT,
+  MAX_BEDS,
+  MIN_BEDS,
+  MAX_PHOTOS: MAX_PHOTOS_UPLOAD,
+  MAX_PHOTO_SIZE_MB: PHOTO_MAX_SIZE_MB,
+  PHOTO_MAX_WIDTH,
+  LANDMARK_CHAR_MIN,
+  LANDMARK_CHAR_MAX,
+  COOLDOWN_SECONDS,
+} as const;

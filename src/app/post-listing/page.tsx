@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { parseVacancyMessage } from '@/lib/parseVacancy'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Upload, X, ImagePlus } from 'lucide-react'
-import { CONFIG } from '@/config'
+import { Upload, X, ImagePlus, MessageCircle, Zap } from 'lucide-react'
+import { CONFIG } from '@/lib/constants'
 import { motion } from 'framer-motion'
+import type { ParseVacancyResult } from '@/types'
 
 const listingSchema = z.object({
   title: z.string().min(5, 'Title too short').max(100),
@@ -22,6 +24,8 @@ const listingSchema = z.object({
     .min(CONFIG.MIN_BEDS, `At least ${CONFIG.MIN_BEDS} bed`)
     .max(CONFIG.MAX_BEDS, `Max ${CONFIG.MAX_BEDS} beds`),
   gender_preference: z.enum(['male', 'female', 'any']),
+  phone_number: z.string().regex(/^$|03[0-4][0-9]{9}$/, 'Phone must be 03XX-XXXXXXX format (optional)').optional().or(z.literal('')),
+  type: z.enum(['permanent', 'temporary']).optional(),
   description: z.string().optional(),
   amenities: z.array(z.string()).optional(),
 }).refine(
@@ -77,6 +81,11 @@ export default function PostListingPage() {
   const [photos, setPhotos] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
+  // Quick Post states
+  const [whatsappMessage, setWhatsappMessage] = useState('')
+  const [parseLoading, setParseLoading] = useState(false)
+  const [parseSuccess, setParseSuccess] = useState(false)
+  const [parseError, setParseError] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -86,8 +95,7 @@ export default function PostListingPage() {
     })
   }, [router])
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, watch, reset } = useForm<FormData>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { register, handleSubmit, formState: { errors, isSubmitting }, watch, reset, setValue } = useForm<FormData>({
     resolver: zodResolver(listingSchema) as any,
     defaultValues: {
       area_type: 'preset',
@@ -99,10 +107,11 @@ export default function PostListingPage() {
       custom_area: '',
       description: '',
       area_id: undefined,
+      phone_number: '',
+      type: 'permanent',
     },
   })
 
-  // eslint-disable-next-line react-hooks/incompatible-library
   const areaType = watch('area_type')
 
   useEffect(() => {
@@ -160,6 +169,8 @@ export default function PostListingPage() {
       rent: data.rent,
       beds_available: data.beds_available,
       gender_preference: data.gender_preference,
+      phone_number: data.phone_number || null,
+      type: data.type || 'permanent',
       photos: photoUrls,
       amenities: data.amenities || [],
       description: data.description || '',
@@ -182,8 +193,48 @@ export default function PostListingPage() {
 
     reset()
     setPhotos([])
+    setWhatsappMessage('')
+    setParseSuccess(false)
     setUploading(false)
     router.push(`/listings/${listing.id}`)
+  }
+
+  const handleQuickPost = useCallback(async () => {
+    if (!whatsappMessage.trim()) return
+
+    setParseLoading(true)
+    setParseError(null)
+    setParseSuccess(false)
+
+    try {
+      const parsed = await parseVacancyMessage(whatsappMessage)
+      // Map to form
+      setValue('title', parsed.title)
+      setValue('rent', parsed.rent || 0)
+      setValue('beds_available', parsed.beds)
+      setValue('gender_preference', parsed.gender_preference)
+      setValue('phone_number', parsed.contact || '')
+      setValue('type', parsed.type || 'permanent')
+      setValue('description', parsed.description)
+      setValue('area_id', parsed.area_id || '')
+      setValue('custom_area', parsed.custom_area || '')
+      setValue('area_type', parsed.area_id ? 'preset' : 'other')
+      setValue('amenities', parsed.amenities)
+      setParseSuccess(true)
+      setTimeout(() => setParseSuccess(false), 3000)
+      // Scroll to form
+      document.querySelector('input[name="title"]')?.scrollIntoView({ behavior: 'smooth' })
+    } catch (err) {
+      setParseError('Could not parse message. Please fill manually.')
+    } finally {
+      setParseLoading(false)
+    }
+  }, [whatsappMessage, setValue])
+
+  const sampleMessage = "1 permanent vacancy available near tipu burger in dha phase 2 ext All facilities available Contact: 03323831999"
+
+  const loadSample = () => {
+    setWhatsappMessage(sampleMessage)
   }
 
   return (
@@ -193,9 +244,67 @@ export default function PostListingPage() {
       className="max-w-2xl mx-auto px-4 py-12"
     >
       <h1 className="text-3xl font-bold text-gray-900 mb-2">Post a Free Listing</h1>
-      <p className="text-gray-500 mb-8">
-        Your listing goes live instantly. Phone‑verified owners can see your contact.
+      <p className="text-lg font-medium text-indigo-600 mb-4 flex items-center gap-2">
+        <Zap className="w-5 h-5" />
+        Have a WhatsApp vacancy message? Use <span className="underline cursor-pointer hover:text-indigo-700" onClick={loadSample}>Quick Post</span>
       </p>
+
+      {/* Quick Post UI */}
+      <motion.div 
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+className="bg-linear-to-r from-indigo-50 to-blue-50 rounded-2xl p-6 border-2 border-dashed border-indigo-200 mb-8"
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <MessageCircle className="w-6 h-6 text-indigo-600" />
+          <h2 className="text-xl font-bold text-gray-900">🚀 Quick Post – Paste WhatsApp Message</h2>
+        </div>
+        <textarea
+          value={whatsappMessage}
+          onChange={(e) => setWhatsappMessage(e.target.value)}
+          placeholder="Paste raw WhatsApp vacancy message here... e.g. '1 permanent vacancy near tipu burger DHA Phase 2...'"
+          rows={6}
+          className="w-full p-4 border border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 resize-vertical bg-white/50 backdrop-blur-sm text-sm"
+        />
+        <motion.button
+          onClick={handleQuickPost}
+          disabled={parseLoading || !whatsappMessage.trim()}
+          whileHover={{ scale: 1.02 }}
+          className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {parseLoading ? (
+            <span className="animate-spin w-5 h-5 border-2 border-white/30 rounded-full border-r-white" />
+          ) : (
+            <Zap className="w-5 h-5" />
+          )}
+          {parseLoading ? 'Parsing...' : 'Parse & Pre-fill Form'}
+        </motion.button>
+        {parseSuccess && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mt-3 p-4 bg-green-100 border border-green-300 rounded-xl text-green-800 text-sm font-medium flex items-center gap-2"
+          >
+            ✅ Details extracted! Review and submit.
+          </motion.div>
+        )}
+        {parseError && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mt-3 p-4 bg-red-100 border border-red-300 rounded-xl text-red-800 text-sm"
+          >
+            {parseError}
+          </motion.div>
+        )}
+        <button
+          type="button"
+          onClick={loadSample}
+          className="mt-3 text-sm text-indigo-600 hover:text-indigo-700 font-medium underline"
+        >
+          📱 Load Sample WhatsApp Message
+        </button>
+      </motion.div>
 
       {error && <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
 
@@ -287,6 +396,29 @@ export default function PostListingPage() {
               <option value="any">Any Gender</option>
             </select>
             {errors.gender_preference && <p className="text-red-500 text-xs mt-1">{errors.gender_preference.message}</p>}
+          </div>
+
+          {/* Phone Number */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number (optional)</label>
+            <input
+              {...register('phone_number')}
+              placeholder="03XX-XXXXXXX"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/60 backdrop-blur-sm"
+            />
+            {errors.phone_number && <p className="text-red-500 text-xs mt-1">{errors.phone_number.message}</p>}
+          </div>
+
+          {/* Listing Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <select
+              {...register('type')}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white/60 backdrop-blur-sm"
+            >
+              <option value="permanent">Permanent</option>
+              <option value="temporary">Temporary</option>
+            </select>
           </div>
 
           {/* Amenities */}

@@ -10,6 +10,8 @@ export interface Listing {
   rent: number;
   beds_available: number;
   gender_preference: 'male' | 'female' | 'any';
+  phone_number: string | null;
+  type: 'permanent' | 'temporary' | null;
   photos: string[];
   description: string;
   amenities: string[];
@@ -54,6 +56,20 @@ export interface Profile {
   created_at: string;
 }
 
+// Quick Post Parser
+export interface ParseVacancyResult {
+  title: string;
+  rent: number | null;
+  beds: number;
+  gender_preference: 'male' | 'female' | 'any';
+  contact: string | null;
+  custom_area: string | null;
+  area_id: string | null;
+  description: string;
+  amenities: string[];
+  type: 'permanent' | 'temporary' | null;
+}
+
 // API Response types
 export interface ApiResponse<T> {
   data: T | null;
@@ -83,3 +99,4 @@ export interface FormErrors {
     message: string;
   };
 }
+

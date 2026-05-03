@@ -5,11 +5,10 @@ const eslintConfig = [
   },
   {
     rules: {
-      // Allow any for now to avoid type issues with complex Next.js types
-      "@typescript-eslint/no-explicit-any": "off",
       "@next/next/no-img-element": "off",
     },
   },
 ];
+
 
 export default eslintConfig;
