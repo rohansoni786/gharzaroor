@@ -22,7 +22,7 @@ export interface Listing {
   owner_id: string;
   created_at: string;
   updated_at: string;
-  areas?: { name: string } | null;
+  areas?: { name: string } | null | undefined;
 }
 
 export interface WantedAd {

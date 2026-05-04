@@ -24,11 +24,11 @@ export async function proxy(request: NextRequest) {
       cookies: {
         getAll() {
           const cookies = request.cookies.getAll();
-          console.log("🍪 Cookies received:", cookies.map(c => c.name));
+
           return cookies;
         },
         setAll(cookiesToSet) {
-          console.log("🍪 Setting cookies:", cookiesToSet.map(c => c.name));
+
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
           });
@@ -38,7 +38,7 @@ export async function proxy(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  console.log("👤 User:", user?.email || "not authenticated");
+
 
   if (!user) {
     const signInUrl = new URL("/?auth=login", request.url);

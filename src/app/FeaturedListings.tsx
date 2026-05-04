@@ -8,7 +8,7 @@ import ListingCard from '@/components/ListingCard'
 // import Skeleton from '@/components/Skeleton'
 
 
-type ListingWithArea = Listing & { areas: { name: string } | null }
+type ListingWithArea = Listing
 
 export default function FeaturedListings() {
   const [listings, setListings] = useState<ListingWithArea[]>([])
@@ -27,7 +27,7 @@ export default function FeaturedListings() {
           .limit(3)
 
         if (error) throw error
-        if (data) setListings(data as ListingWithArea[])
+        if (data) setListings(data as Listing[])
       } catch (err: any) {
         setError('Failed to load featured listings. Please try again later.')
         console.error('Featured listings error:', err)

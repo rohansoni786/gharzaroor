@@ -2,18 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { MapPin, Bed, Banknote, Phone } from "lucide-react";
-
-type Listing = {
-  id: string;
-  title: string;
-  rent: number;
-  beds_available: number;
-  gender_preference: string;
-  photos: string[];
-  areas: { name: string } | null;
-  custom_area: string | null;
-  status?: string;
-};
+import { Listing } from '@/types/index';
 
 export default function ListingCard({ listing }: { listing: Listing }) {
   const areaName = listing.areas?.name || listing.custom_area || "Custom area";
