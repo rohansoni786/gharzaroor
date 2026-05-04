@@ -1,92 +1,70 @@
-'use client'
+import Image from "next/image";
+import Link from "next/link";
+import { MapPin, Bed, Banknote, Phone } from "lucide-react";
 
-import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
-import { Listing } from '@/types/index'
-import ListingCard from '@/components/ListingCard'
-// import Skeleton from '@/components/Skeleton'
+// Allow photos to be null or undefined
+type Listing = {
+  id: string;
+  title: string;
+  rent: number;
+  beds_available: number;
+  gender_preference: string;
+  photos?: string[] | null;
+  areas: { name: string } | null;
+  custom_area: string | null;
+};
 
-
-type ListingWithArea = Listing
-
-export default function FeaturedListings() {
-  const [listings, setListings] = useState<ListingWithArea[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    async function fetchFeatured() {
-      try {
-        setLoading(true)
-        const { data, error } = await supabase
-          .from('listings')
-          .select('*, areas(name)')
-          .eq('status', 'live')
-          .order('created_at', { ascending: false })
-          .limit(3)
-
-        if (error) throw error
-        if (data) setListings(data as Listing[])
-      } catch (err: any) {
-        setError('Failed to load featured listings. Please try again later.')
-        console.error('Featured listings error:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchFeatured()
-  }, [])
-
-  if (loading) {
-    return (
-      <section className="py-20 px-4 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <div className="h-8 w-64 bg-gray-200 rounded-lg mx-auto mb-4 animate-pulse"></div>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {[1,2,3].map((i) => (
-              <div key={i} className="h-80 w-full bg-white rounded-2xl shadow-lg animate-pulse overflow-hidden">
-                <div className="h-48 bg-gray-200" />
-                <div className="p-6 space-y-3">
-                  <div className="h-6 bg-gray-200 rounded w-64" />
-                  <div className="h-4 bg-gray-200 rounded w-32" />
-                  <div className="flex gap-2">
-                    <div className="h-4 bg-gray-200 rounded-full w-16" />
-                    <div className="h-4 bg-gray-200 rounded-full w-16" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-        </div>
-      </section>
-    )
-  }
-
-  if (error || listings.length === 0) {
-    return null // Hide section if no listings or error
-  }
+export default function ListingCard({ listing }: { listing: Listing }) {
+  const areaName = listing.areas?.name || listing.custom_area || "Custom area";
+  const firstPhoto = listing.photos?.[0] || null;
 
   return (
-    <section className="py-20 px-4 bg-gray-50">
-      <div className="max-w-6xl mx-auto">
-        <h3 className="text-3xl font-black text-gray-900 text-center mb-12">Just Listed</h3>
-        <div className="grid md:grid-cols-3 gap-6">
-          {listings.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} />
-          ))}
+    <div className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-lg transition border border-gray-100">
+      <div className="relative h-48 bg-gray-200" style={{ position: "relative" }}>
+        {firstPhoto ? (
+          <Image
+            src={firstPhoto}
+            alt={listing.title}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <span className="absolute inset-0 flex items-center justify-center text-4xl">🏠</span>
+        )}
+      </div>
+
+      <div className="p-5">
+        <h3 className="font-bold text-lg text-gray-900 mb-1">{listing.title}</h3>
+        <div className="flex items-center gap-3 text-sm text-gray-500 mb-3">
+          <span className="flex items-center gap-1">
+            <MapPin className="w-4 h-4" /> {areaName}
+          </span>
+          <span className="flex items-center gap-1">
+            <Bed className="w-4 h-4" /> {listing.beds_available} {listing.beds_available === 1 ? "Bed" : "Beds"}
+          </span>
+          <span className="flex items-center gap-1">
+            <Banknote className="w-4 h-4" /> PKR {listing.rent.toLocaleString()}
+          </span>
         </div>
-        <div className="text-center mt-12">
-          <Link href="/listings" className="inline-flex items-center gap-2 px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg">
-            View All Listings
+
+        <div className="flex items-center justify-between">
+          <span className="text-xs px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full font-medium">
+            {listing.gender_preference === "any"
+              ? "Any Gender"
+              : listing.gender_preference === "male"
+                ? "Male Only"
+                : "Female Only"}
+          </span>
+          <Link
+            href={`/listings/${listing.id}`}
+            className="flex items-center gap-1 text-indigo-600 text-sm font-semibold hover:underline"
+          >
+            <Phone className="w-4 h-4" /> Contact
           </Link>
         </div>
       </div>
-    </section>
-  )
+    </div>
+  );
 }
-
