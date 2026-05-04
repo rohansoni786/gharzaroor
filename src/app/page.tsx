@@ -55,6 +55,15 @@ export default function HomePage() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
+  // After returning from Google OAuth, check for stored redirect
+useEffect(() => {
+  const storedRedirect = localStorage.getItem('redirectAfterLogin')
+  if (storedRedirect) {
+    localStorage.removeItem('redirectAfterLogin')
+    router.push(storedRedirect)
+  }
+}, [])
+
   const handleModalClose = () => {
     setShowAuthModal(false)
   }
