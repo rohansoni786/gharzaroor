@@ -10,7 +10,6 @@ import Hero from './Hero'
 import AuthModal from './AuthModal'
 import FeaturedListings from './FeaturedListings'
 import Footer from './Footer'
-import { AuthTrigger } from './AuthTrigger'
 
 export default function HomePage() {
   const router = useRouter()
@@ -70,11 +69,6 @@ useEffect(() => {
 
   return (
     <>
-      <AuthTrigger 
-        onRedirectSet={handleRedirectSet}
-        onModalOpen={handleModalOpen}
-        onModalViewSet={() => {}} // Not used anymore
-      />
       <main className="min-h-screen bg-white flex flex-col">
         {/* COUNTDOWN BANNER */}
         {freeDaysLeft > 0 && (

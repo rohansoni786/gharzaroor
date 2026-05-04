@@ -1,20 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 
-export function AuthTrigger({ 
-  onRedirectSet, 
-  onModalOpen, 
-  onModalViewSet 
+export function AuthTrigger({
+  onRedirectSet,
+  onModalOpen,
 }: {
   onRedirectSet: (redirect: string | null) => void
   onModalOpen: () => void
-  onModalViewSet: (view: string) => void
 }) {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  
+
   useEffect(() => {
     const auth = searchParams.get('auth')
     if (auth === 'login') {
@@ -23,10 +20,8 @@ export function AuthTrigger({
         onRedirectSet(decodeURIComponent(redirect))
       }
       onModalOpen()
-      onModalViewSet('login')
     }
-  }, [searchParams, onRedirectSet, onModalOpen, onModalViewSet])
-  
+  }, [searchParams, onRedirectSet, onModalOpen])
+
   return null
 }
-
